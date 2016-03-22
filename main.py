@@ -1,68 +1,97 @@
 #!/usr/bin/python
+from __future__ import print_function
+
+import time
 
 import numpy as np
-
-from sklearn.preprocessing import LabelEncoder
+import pandas as pd 
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction import text
 from sklearn.ensemble import RandomForestClassifier
-from numpy import genfromtxt, savetxt
-from StringIO import StringIO
+
+t0 = time.clock()
+stopWords = text.ENGLISH_STOP_WORDS
 
 def main():
-    # Import training set to array [(phrase,sentiment)] 
-    # Example: [("Jag gillar allt",5),("Jag hatar allt",1)]
-    trainingSet = genfromtxt(
-	    			open('testData/train.tsv','r') , 
-	    			usecols=(2, 3), 
-					delimiter='\t',
-					dtype=None, 
-					skip_header=1,
-					# Some strings contains '#', don't know how to disable this
-					comments='/nocomment/'
-				)
-    #print trainingSet
+	pathTrainingData = "data/train.tsv"
+	pathTestData = "data/test.tsv"
 
-    # Phrase array
-    # Example: [["Jag gillar allt",5],["Jag hatar allt",2]]
-    train = [x[0] for x in trainingSet]
-    print train
+	print("Importing '{:s}'...".format(pathTrainingData), end="")
+	# Import training data
+	train = pd.read_csv(pathTrainingData, 
+						header=0, 
+						delimiter="\t", 
+						quoting=3,
+						nrows = 10	
+						)
+	printTime()
 
-    encodedTrain = LabelEncoder().fit_transform(train)
-    label = [x[1] for x in trainingSet]
-    
-    #encodedTrain = zip(encodedTrain,label)
+	numPhrasesTrain = train['Phrase'].size
 
-    
-    # Import test set to array [phraseID] 
-    # Example: ["Hahaha","Hohoho"]
-    testSet = genfromtxt(
-				open('testData/test.tsv','r') , 
-				usecols=(2),
-				delimiter='\t',
-				dtype=None,
-				skip_header=1,
-				comments='/nocomment/'
-				)
-    
-    test = [x[1:] for x in testSet]
+	# Create features with bag-of-words
+	vectorizer = CountVectorizer(	analyzer = "word",
+									tokenizer = None,
+									preprocessor = None,
+									stop_words = stopWords, 
+									max_features = 4000,
+									lowercase = True)
 
-    encodedTestSet = LabelEncoder().fit_transform(test)
-   
+	phrases = []
+	sentiments = []
+	for x in xrange(0,numPhrasesTrain):
+		phrases.append(train['Phrase'][x])
+		sentiments.append(train['Sentiment'][x])
 
-    #create and train the random forest
-    #multi-core CPUs can use: rf = RandomForestClassifier(n_estimators=100, n_jobs=2)
-    rf = RandomForestClassifier(n_estimators=100)
-    
-    #rf.fit(encodedTrain,label)
+	print("Fit and transform training features ", end="")
+	train_data_features = vectorizer.fit_transform(phrases)
+	printTime()
 
-    #pred = [[index + 1, x[1]] for index, x in enumerate(rf.predict(encodedTestSet))]
-   
-    #predicted_probs = [[index + 1, x[1]] for index, x in enumerate(rf.predict_proba(encodedTestSet))]
-    #print predicted_probs
+	train_data_features = train_data_features.toarray()
 
-    #savetxt('testData/submission2.csv', rf.predict(testSet), delimiter='\t', fmt='%s')
-    
-  
+	forest = RandomForestClassifier(n_estimators = 100, n_jobs = 4) 
 
+	train_data_labels = sentiments
+	
+	print("Fitting training data...", end="")
+	forest = forest.fit(train_data_features, train_data_labels)
+	printTime()
+
+	print("Importing '{:s}'...".format(pathTestData),end="")
+	test = pd.read_csv(	pathTestData, 
+						header=0, 
+						delimiter="\t", 
+						quoting=3,
+						nrows = 10
+						)
+	printTime()
+
+	numPhrasesTest = test['Phrase'].size
+
+	testPhrases = []
+	for x in xrange(0,numPhrasesTest):
+		testPhrases.append(test['Phrase'][x])
+	
+	test_data = vectorizer.transform(testPhrases)
+	test_data = test_data.toarray()
+
+	print("Making prediction...", end="")
+	output = forest.predict(test_data)
+	printTime()
+
+	submissionFile = open("submission.csv", 'w')
+
+	submissionFile.write("PhraseID,Sentiment\n")
+
+	print("Creating submission file...", end="")
+	for x in xrange(0,numPhrasesTest):
+		submissionFile.write(str(test['PhraseId'][x])+","+str(output[x])+"\n")
+	printTime()
+
+def printTime():
+	print("({:s})".format(str(time.clock()-t0)))
+ 	
 if __name__=="__main__":
-    main()
-    print "done"
+	print("Program has started!")
+	main()
+	print("Program has ended!", end="")
+	printTime()
