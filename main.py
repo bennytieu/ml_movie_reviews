@@ -2,96 +2,118 @@
 from __future__ import print_function
 
 import time
+import json
+import sys
 
-import numpy as np
+
 import pandas as pd 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction import text
 from sklearn.ensemble import RandomForestClassifier
 
-t0 = time.clock()
-stopWords = text.ENGLISH_STOP_WORDS
+
+startTime = time.clock()
+currentTime = startTime
 
 def main():
-	pathTrainingData = "data/train.tsv"
-	pathTestData = "data/test.tsv"
+	global currentTime
 
-	print("Importing '{:s}'...".format(pathTrainingData), end="")
-	# Import training data
-	train = pd.read_csv(pathTrainingData, 
-						header=0, 
-						delimiter="\t", 
-						quoting=3,
-						nrows = 10	
-						)
-	printTime()
+	with open("settings.json", "r") as jsonFile:
+		jsonData = json.load(jsonFile)
 
-	numPhrasesTrain = train['Phrase'].size
+		pathTrainingData = jsonData["train_path"]
+		pathTestData = jsonData["test_path"]
 
-	# Create features with bag-of-words
-	vectorizer = CountVectorizer(	analyzer = "word",
-									tokenizer = None,
-									preprocessor = None,
-									stop_words = stopWords, 
-									max_features = 4000,
-									lowercase = True)
+		# Import training data
+		print("\t{: <40}".format("Importing training data."), end="")
+		sys.stdout.flush()
+		train = pd.read_csv(pathTrainingData, 
+							header=0, 
+							delimiter="\t", 
+							quoting= jsonData["train_quoting"],
+							nrows = jsonData["train_n_rows"]
+							)
+		printTime(currentTime)
 
-	phrases = []
-	sentiments = []
-	for x in xrange(0,numPhrasesTrain):
-		phrases.append(train['Phrase'][x])
-		sentiments.append(train['Sentiment'][x])
+		if(jsonData["stop_words"]): stopWords = text.ENGLISH_STOP_WORDS
+		else: stopWords = None
 
-	print("Fit and transform training features ", end="")
-	train_data_features = vectorizer.fit_transform(phrases)
-	printTime()
+		# Create features with bag-of-words
+		vectorizer = CountVectorizer(	analyzer = "word",
+										tokenizer = None,
+										preprocessor = None,
+										stop_words = stopWords, 
+										max_features = jsonData["max_features"],
+										lowercase = jsonData["lowercase"])
 
-	train_data_features = train_data_features.toarray()
+		phrases = []
+		sentiments = []
+		numPhrasesTrain = train['Phrase'].size
+		for x in xrange(0,numPhrasesTrain):
+			phrases.append(train['Phrase'][x])
+			sentiments.append(train['Sentiment'][x])
 
-	forest = RandomForestClassifier(n_estimators = 100, n_jobs = 4) 
+		print("\t{: <40}".format("Fit and transform training features."), end="")
+		sys.stdout.flush()
+		traningDataFeatures = vectorizer.fit_transform(phrases)
+		printTime(currentTime)
 
-	train_data_labels = sentiments
-	
-	print("Fitting training data...", end="")
-	forest = forest.fit(train_data_features, train_data_labels)
-	printTime()
+		traningDataFeatures = traningDataFeatures.toarray()
 
-	print("Importing '{:s}'...".format(pathTestData),end="")
-	test = pd.read_csv(	pathTestData, 
-						header=0, 
-						delimiter="\t", 
-						quoting=3,
-						nrows = 10
-						)
-	printTime()
+		randomForest = RandomForestClassifier(n_estimators = jsonData["n_estimators"], 
+										n_jobs = jsonData["n_jobs"]) 
 
-	numPhrasesTest = test['Phrase'].size
+		trainingDataLabels = sentiments
+		
+		print("\t{: <40}".format("Fitting training data."), end="")
+		sys.stdout.flush()
+		randomForest = randomForest.fit(traningDataFeatures, trainingDataLabels)
+		printTime(currentTime)
 
-	testPhrases = []
-	for x in xrange(0,numPhrasesTest):
-		testPhrases.append(test['Phrase'][x])
-	
-	test_data = vectorizer.transform(testPhrases)
-	test_data = test_data.toarray()
+		print("\t{: <40}".format("Importing test data."), end="")
+		sys.stdout.flush()
+		test = pd.read_csv(	pathTestData, 
+							header=0, 
+							delimiter="\t", 
+							quoting=3,
+							nrows = 10
+							)
+		printTime(currentTime)
 
-	print("Making prediction...", end="")
-	output = forest.predict(test_data)
-	printTime()
+		numPhrasesTest = test['Phrase'].size
 
-	submissionFile = open("submission.csv", 'w')
+		testPhrases = []
+		for x in xrange(0,numPhrasesTest):
+			testPhrases.append(test['Phrase'][x])
 
-	submissionFile.write("PhraseID,Sentiment\n")
+		print("\t{: <40}".format("Transform test phrases."), end="")
+		testData = vectorizer.transform(testPhrases)
+		testData = testData.toarray()
+		printTime(currentTime)
 
-	print("Creating submission file...", end="")
-	for x in xrange(0,numPhrasesTest):
-		submissionFile.write(str(test['PhraseId'][x])+","+str(output[x])+"\n")
-	printTime()
+		print("\t{: <40}".format("Making predictions for test."), end="")
+		sys.stdout.flush()
+		predictedData = randomForest.predict(testData)
+		printTime(currentTime)
 
-def printTime():
-	print("({:s})".format(str(time.clock()-t0)))
+		with open("submission.csv", "w") as submissionFile:
+			submissionFile.write("PhraseID,Sentiment\n")
+
+			print("\t{: <40}".format("Creating submission file"), end="")
+			sys.stdout.flush()
+			for x in xrange(0,numPhrasesTest):
+				submissionFile.write(str(test['PhraseId'][x])+","+str(predictedData[x])+"\n")
+			printTime(currentTime)
+
+def printTime(t0):
+	global currentTime
+	currentTime = time.clock()
+	timeElasped = round(time.clock()-t0,3)
+
+	print("{: <50}".format(""+str(timeElasped)+" s"))
  	
 if __name__=="__main__":
-	print("Program has started!")
+	print("Starting...")
 	main()
-	print("Program has ended!", end="")
-	printTime()
+	print("End. Total time elapsed: ", end="")
+	printTime(startTime)
