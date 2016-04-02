@@ -8,11 +8,12 @@ import re
 
 import pandas as pd 
 import numpy as np
+import string
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction import text
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction.text import TfidfTransformer
 
@@ -21,6 +22,7 @@ currentTime = startTime
 
 def main():
 	global currentTime
+	exclude = set(string.punctuation)
 
 	with open("settings.json", "r") as jsonFile:
 		jsonData = json.load(jsonFile)
@@ -45,11 +47,11 @@ def main():
 										stop_words = {text.ENGLISH_STOP_WORDS},
 										lowercase = True,
 										#max_df = 1.0,
-										min_df = 0.000025,
+										min_df = 0.000030,
 										ngram_range=(1, 2)
 										)),
 							('tfidf', TfidfTransformer()),
-							('lSVC', LinearSVC(C=0.4))])	
+							('lSVC', SVC(kernel='linear'))])	
 
 		print("\t{: <40}".format("Fitting training data."), end="")
 		sys.stdout.flush()
@@ -57,8 +59,7 @@ def main():
 		phrases = []
 		sentiments = []
 		for x in xrange(0,len(train['Phrase'])):
-			#lettersOnlyPhrase = re.sub("[^a-zA-Z]", " ", train['Phrase'][x])  
-			phrases.append(train['Phrase'][x])
+			phrases.append(''.join(ch for ch in train['Phrase'][x] if ch not in exclude))
 
 		text_clf = text_clf.fit(phrases, train['Sentiment'])
 		printTime(currentTime)
@@ -78,8 +79,7 @@ def main():
 
 		phraseTest = []
 		for x in xrange(0,len(test['Phrase'])):
-			#lettersOnlyPhrase = re.sub("[^a-zA-Z]", " ", test['Phrase'][x])  
-			phraseTest.append(test['Phrase'][x])
+			phraseTest.append(''.join(ch for ch in test['Phrase'][x] if ch not in exclude))
 
 		predictedData = text_clf.predict(phraseTest)
 		printTime(currentTime)
