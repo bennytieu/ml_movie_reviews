@@ -5,12 +5,11 @@ import time
 import json
 import sys
 
-
 import pandas as pd 
+
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction import text
 from sklearn.ensemble import RandomForestClassifier
-
 
 startTime = time.clock()
 currentTime = startTime
@@ -27,24 +26,28 @@ def main():
 		# Import training data
 		print("\t{: <40}".format("Importing training data."), end="")
 		sys.stdout.flush()
+
+		if jsonData["train_n_rows"] == -1: jsonTrainNRows = None
+		else: jsonTrainNRows = jsonData["train_n_rows"]
+
 		train = pd.read_csv(pathTrainingData, 
 							header=0, 
 							delimiter="\t", 
 							quoting= jsonData["train_quoting"],
-							nrows = jsonData["train_n_rows"]
+							nrows = jsonTrainNRows
 							)
 		printTime(currentTime)
 
 		if(jsonData["stop_words"]): stopWords = text.ENGLISH_STOP_WORDS
 		else: stopWords = None
-
-		# Create features with bag-of-words
 		vectorizer = CountVectorizer(	analyzer = "word",
 										tokenizer = None,
 										preprocessor = None,
-										stop_words = stopWords, 
-										max_features = jsonData["max_features"],
-										lowercase = jsonData["lowercase"])
+										stop_words = stopWords,
+										min_samples_leaf = jsonData['min_samples_leaf'],
+										lowercase = jsonData["lowercase"],
+										ngram_range=(1, jsonData["ngram_max"])
+									)
 
 		phrases = []
 		sentiments = []
@@ -55,6 +58,7 @@ def main():
 
 		print("\t{: <40}".format("Fit and transform training features."), end="")
 		sys.stdout.flush()
+
 		traningDataFeatures = vectorizer.fit_transform(phrases)
 		printTime(currentTime)
 
@@ -72,11 +76,14 @@ def main():
 
 		print("\t{: <40}".format("Importing test data."), end="")
 		sys.stdout.flush()
+
+		if jsonData["test_n_rows"] == -1: jsonTestNRows = None
+		else: jsonTestNRows = jsonData["test_n_rows"]
 		test = pd.read_csv(	pathTestData, 
 							header=0, 
 							delimiter="\t", 
-							quoting=3,
-							nrows = 10
+							quoting=jsonData["train_quoting"],
+							nrows = jsonTestNRows
 							)
 		printTime(currentTime)
 
