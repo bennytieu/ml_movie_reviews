@@ -23,7 +23,6 @@ startTime = time.time()
 currentTime = startTime
 
 
-
 def main():
 	global currentTime
 
@@ -44,10 +43,11 @@ def main():
 									analyzer = "word",
 									tokenizer = tokenize,
 									preprocessor = None,
-									#stop_words = {text.ENGLISH_STOP_WORDS},
+									stop_words = {text.ENGLISH_STOP_WORDS},
 									lowercase = True,
-									max_df = 1.0,
+									#max_df = 1.0,
 									min_df = 0.000040,
+									#min_df = 1,
 									ngram_range=(1, 2)
 									)),
 						('tfidf', TfidfTransformer()),
@@ -93,8 +93,18 @@ def main():
 		printTime(currentTime)
 
 def tokenize(text):
-    text = "".join([ch for ch in text if ch not in string.punctuation])
+	# Remove punctuation
+    #text = "".join([ch for ch in text if ch not in string.punctuation])
+    # Remove numbers
+    #text = re.sub("[0-9]", " ", text)
+    # Placeholder numbers
+    #text = re.sub("[0-9]", "{num}", text)
+
+    text = re.sub("[^a-zA-Z]", " ", text)
     tokens = nltk.word_tokenize(text)
+
+
+
     res = stemTokens(tokens)
     #res = lemLokens(tokens)
 
@@ -111,7 +121,7 @@ def lemLokens(tokens):
 	lemmer = nltk.stem.WordNetLemmatizer()
 	lemmed = []
 	for token in tokens:
-		stemmed.append(lemmer.lemmatize(token))
+		lemmed.append(lemmer.lemmatize(token))
 	return lemmed
 
 def printTime(t0):
